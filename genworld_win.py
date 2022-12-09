@@ -12,7 +12,7 @@ import numpy as np
 from threading import Thread
 import threading
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv,VecFrameStack
+from stable_baselines3.common.vec_env import DummyVecEnv,VecFrameStack,StackedObservations
 
 
 # In[2]:
@@ -29,7 +29,10 @@ from stable_baselines3.common.vec_env import DummyVecEnv,VecFrameStack
 #     print(thread.name)
 
 
-# ### Agent-based RL in Simple Worlds
+# ### Agent-based RL in Simple Worlds with windowing and Meta-RL
+# 
+# - using window of states in case where velocity is masked
+# - can use meta-RL: **TBD test with varying physics in a CL setting**
 
 # In[4]:
 
@@ -59,14 +62,14 @@ class MaskedPole(Env):
 # In[5]:
 
 
-env = gym.make("CartPole-v1")
+# env = gym.make("CartPole-v1")
 # env = gym.make('MountainCar-v0')
 
 
 # In[6]:
 
 
-# env = MaskedPole()
+env = MaskedPole()
 
 
 # In[7]:
@@ -199,28 +202,34 @@ world=GenWorld(env=env)
 # In[15]:
 
 
-worldthread=Thread(name='world',target=world.run,args=(agent,1000,200))
+agent.tot_rew,agent.rewL,agent.ep=0,[],[]
 
 
 # In[16]:
 
 
-worldthread.start()
+worldthread=Thread(name='world',target=world.run,args=(agent,1000,200))
 
 
 # In[17]:
 
 
-agent.avg_rew()/len(agent.ep)
+worldthread.start()
 
 
 # In[18]:
 
 
-# world.run(agent,10,10)
+agent.avg_rew()/len(agent.ep)
 
 
 # In[19]:
+
+
+# world.run(agent,10,10)
+
+
+# In[20]:
 
 
 # agent.memory.perceptual_memory
@@ -228,7 +237,7 @@ agent.avg_rew()/len(agent.ep)
 
 # ### Training an AI Agent's Model using Generic RL Agent
 
-# In[20]:
+# In[21]:
 
 
 from threading import Thread
@@ -236,91 +245,87 @@ import threading
 import sys
 
 
-# In[21]:
+# In[22]:
 
 
 from queue import Queue
 
 
-# In[22]:
+# In[23]:
 
 
 from aiagentbase import RLAgent
 
 
-# In[23]:
-
-
-training_steps=20000
-
-
 # In[24]:
 
 
-agent=RLAgent(algoclass=PPO,action_space=env.action_space,observation_space=env.observation_space,
-              verbose=1)
+training_steps=30000
 
 
 # In[25]:
 
 
-agent.debug=False
-agent.use_memory=True
+agent=RLAgent(algoclass=PPO,action_space=env.action_space,observation_space=env.observation_space,
+              verbose=1,win=4,soclass=StackedObservations,metarl=False)
 
 
 # In[26]:
 
 
-agent.rewL=[]
-agent.tot_rew=0
+agent.debug=False
+agent.use_memory=True
+agent.training=True
 
 
 # In[27]:
 
 
-agent.start(training_steps=training_steps)
+agent.rewL=[]
+agent.tot_rew=0
+agent.ep=[]
 
 
 # In[28]:
 
 
-world=GenWorld(env=env)
+if agent.training: agent.start(training_steps=training_steps)
 
 
 # In[29]:
 
 
-# worldthread=Thread(name='world',target=world.run,args=(agent,2000,200))
+world=GenWorld(env=env)
 
 
 # In[30]:
 
 
-# worldthread.start()
+# worldthread=Thread(name='world',target=world.run,args=(agent,2000,200))
 
 
 # In[31]:
 
 
-# len(agent.logL)
+# worldthread.start()
 
 
 # In[32]:
 
 
-# agent.time
+world.run(agent,n_episodes=2000,episode_maxlen=200)
 
 
 # In[33]:
 
 
-# agent.memory.sar_memory[10011]
+# agent.tot_rew/len(agent.ep)
 
 
 # In[34]:
 
 
-world.run(agent,n_episodes=2000,episode_maxlen=200)
+# len(agent.logL)
 
 
 # In[35]:
@@ -347,10 +352,10 @@ world.run(agent,n_episodes=2000,episode_maxlen=200)
 # agent.rewL
 
 
-# In[39]:
+# In[48]:
 
 
-# print(np.gradient(agent.rewL).mean())
+print(np.gradient(agent.rewL).mean())
 
 
 # In[40]:
@@ -359,20 +364,19 @@ world.run(agent,n_episodes=2000,episode_maxlen=200)
 # plt.plot(np.gradient(agent.rewL))
 
 
-# In[43]:
+# In[51]:
 
 
 episodes = 500
 rewL=[]
+agent.training=False
 for episode in range(1, episodes+1):
-    state = env.reset()
     done = False
     score = 0 
     steps=0
+    state = env.reset()
     while not done and steps<=200:
-        # env.render()
-        action=agent.act(state)
-        # action,_ = agent.model.predict(state)
+        action = agent.act(state)
         state, reward, done, info = env.step(action)
         score+=reward
         steps+=1
@@ -381,7 +385,14 @@ for episode in range(1, episodes+1):
 env.close()
 
 
-# In[44]:
+# In[45]:
+
+
+# from matplotlib import pyplot as plt
+# import numpy as np
+
+
+# In[53]:
 
 
 print(np.array(rewL).mean())
@@ -390,5 +401,11 @@ print(np.array(rewL).mean())
 # In[ ]:
 
 
+# plt.plot(rewL)
 
+
+# In[ ]:
+
+
+# PPO??
 
