@@ -211,7 +211,7 @@ worldthread.start()
 # In[17]:
 
 
-agent.avg_rew()/len(agent.ep)
+#agent.avg_rew()/len(agent.ep)
 
 
 # In[18]:
